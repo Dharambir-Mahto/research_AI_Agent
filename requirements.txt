@@ -1,19 +1,10 @@
 Core agent framework
-
 langchain langgraph langchain-google-genai langchain-mcp-adapters
-
 Browser automation
-
 playwright
-
 Web search
-
-tavily-python
-
 Environment variables
-
 python-dotenv
-
 neurotrace
 chromadb
 langchain-chroma
