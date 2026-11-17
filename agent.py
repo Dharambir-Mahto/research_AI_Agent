@@ -201,11 +201,11 @@ async def initialize_agent():
     #     }
     # )
 
-    # summarizer = SummarizationMiddleware(
-    #     model=llm,
-    #     trigger=("tokens", 1024),   # 8000 tokens cross ho to summarize kare
-    #     keep=("messages", 10),       # recent 10 messages rakhe
-    # )
+    summarizer = SummarizationMiddleware(
+        model=llm,
+        trigger=("tokens", 1024),   # 1024 tokens cross ho to summarize kare
+        keep=("messages", 5),       # recent 5 messages rakhe
+    )
 
     agent = create_agent(
         model=llm,
@@ -213,11 +213,11 @@ async def initialize_agent():
         system_prompt=SYSTEM_PROMPT,
         checkpointer=checkpointer,
         store=store,
-        # middleware=[                # <-- YEH NAYA HAI
-        #     pii_guard,
-        #     hitl_guard,
-        #     summarizer,
-        # ],
+        middleware=[                # <-- YEH NAYA HAI
+            # pii_guard,
+            # hitl_guard,
+            summarizer,
+        ],
     )
     print("\n[AGENT] Initialized successfully")
     return agent
