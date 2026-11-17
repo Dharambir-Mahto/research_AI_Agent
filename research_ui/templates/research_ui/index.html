@@ -1,0 +1,442 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>OmniResearch AI — Autonomous Web Intelligence & Executive Reporting</title>
+    
+    <!-- Theme Early Initialization (Prevents FOUC) -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('omni_theme');
+                if (savedTheme === 'light') {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.classList.add('light');
+                } else if (savedTheme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                    document.documentElement.classList.remove('dark');
+                    document.documentElement.classList.add('light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    document.documentElement.classList.remove('light');
+                }
+            } catch (e) {}
+        })();
+    </script>
+
+    <!-- Tailwind CSS (Play CDN for instant, zero-build modern styling) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            900: '#07090e',
+                            800: '#0d121f',
+                            700: '#141b2d',
+                            600: '#1e293b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Marked.js for fast Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Highlight.js for Syntax Highlighting in reports -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- Custom Ultra-Premium CSS (with cache-buster) -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}?v=3.5">
+</head>
+<body class="min-h-screen flex flex-col relative selection:bg-indigo-500/30 selection:text-indigo-200">
+
+    <!-- Ambient Glow Orbs -->
+    <div class="ambient-glow-1"></div>
+    <div class="ambient-glow-2"></div>
+
+    <!-- Navigation Header -->
+    <header class="sticky top-0 z-40 glass-header px-3 sm:px-6 py-2.5 sm:py-3.5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Brand / Logo -->
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div class="relative w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 flex-shrink-0">
+                    <i data-lucide="sparkles" class="w-4 h-4 sm:w-5 sm:h-5 text-white"></i>
+                    <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-400 rounded-full border-2 border-slate-900"></span>
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 sm:gap-2">
+                        <span class="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white truncate">OmniResearch<span class="text-indigo-600 dark:text-indigo-400">.ai</span></span>
+                        <span class="text-[9px] sm:text-[10px] uppercase font-semibold tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 border border-indigo-500/20 flex-shrink-0">v2.5</span>
+                    </div>
+                    <p class="hidden md:block text-xs text-slate-500 dark:text-slate-400">Autonomous Web Agent · Deep Research & Executive Synthesis</p>
+                </div>
+            </div>
+
+            <!-- Agent Runtime Status Capsule -->
+            <div class="hidden lg:flex items-center gap-3">
+                <div id="agent-status-pill" class="flex items-center px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-white/5 backdrop-blur-md">
+                    <span class="pulsing-dot mr-2"></span>
+                    <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">Ready</span>
+                    <span class="mx-2 text-slate-400 dark:text-slate-600">|</span>
+                    <span class="text-xs text-indigo-600 dark:text-indigo-300 font-mono">{{ model_name }}</span>
+                </div>
+            </div>
+
+            <!-- Action Controls -->
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <!-- Theme Switcher Button -->
+                <button id="theme-toggle-btn" 
+                        type="button"
+                        title="Toggle Light / Dark Mode"
+                        class="p-1.5 sm:p-2 rounded-xl bg-slate-200/70 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300/60 dark:border-white/5 transition-all flex items-center justify-center">
+                    <i data-lucide="sun" id="theme-icon-sun" class="w-4 h-4 text-amber-500 hidden"></i>
+                    <i data-lucide="moon" id="theme-icon-moon" class="w-4 h-4 text-indigo-400"></i>
+                </button>
+
+                <!-- Conversation History Toggle -->
+                <button id="toggle-history-btn" 
+                        title="View Conversation History"
+                        class="px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-200/70 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300/60 dark:border-white/5 transition-all flex items-center gap-1 sm:gap-1.5 text-xs font-medium">
+                    <i data-lucide="history" class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400"></i>
+                    <span class="hidden sm:inline">History</span>
+                    <span id="history-count-badge" class="px-1.5 py-0.2 rounded-full bg-slate-300 dark:bg-white/10 text-slate-700 dark:text-slate-300 text-[10px] font-bold">0</span>
+                </button>
+
+                <!-- New Thread Button -->
+                <button id="reset-session-btn" 
+                        title="Start Fresh Research Thread"
+                        class="px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-200/70 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300/60 dark:border-white/5 transition-all flex items-center gap-1 sm:gap-1.5 text-xs font-medium">
+                    <i data-lucide="plus" class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400"></i>
+                    <span class="hidden sm:inline">New</span>
+                </button>
+
+                <!-- Vault / Reports Drawer Toggle -->
+                <button id="toggle-drawer-btn" 
+                        title="Open Reports Vault"
+                        class="relative px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/25 transition-all">
+                    <i data-lucide="folder-archive" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                    <span class="hidden sm:inline">Vault</span>
+                    <span id="reports-count-badge" class="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px] font-bold">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-4 pt-3 sm:pt-6 pb-0 relative z-10 min-h-0">
+
+        <!-- Welcome Hero Section (Visible before first message) -->
+        <div id="welcome-hero" class="py-2 sm:py-6">
+            <div class="text-center max-w-2xl mx-auto mb-6 sm:mb-10">
+                <div class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[11px] sm:text-xs font-medium mb-3 sm:mb-4">
+                    <i data-lucide="shield-check" class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400"></i>
+                    <span>Autonomous Multimodal Intelligence + MCP Tooling</span>
+                </div>
+                <h1 class="text-2xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight mb-2.5 sm:mb-4">
+                    Deep Intelligence.<br>
+                    <span class="bg-gradient-to-r from-indigo-600 via-violet-600 to-cyan-500 dark:from-indigo-400 dark:via-violet-400 dark:to-cyan-400 bg-clip-text text-transparent">Verified Real-Time Research.</span>
+                </h1>
+                <p class="text-xs sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed px-2">
+                    Pose any complex question. The agent autonomously scours the live web with Playwright headless browsers, synthesizes facts with citation references, and exports executive reports in PDF, Word, or Markdown.
+                </p>
+            </div>
+
+            <!-- Starter Prompt Suggestion Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5 max-w-3xl mx-auto">
+                <button class="suggestion-card text-left p-3 sm:p-4 rounded-xl sm:rounded-2xl glass-panel hover-lift flex items-start gap-3 group"
+                        data-prompt="What are the latest breakthroughs in fault-tolerant quantum computing and qubit error mitigation in 2026? Provide a detailed executive research report.">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                        <i data-lucide="atom" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">Quantum Computing 2026</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 sm:line-clamp-2">Fault-tolerant logical qubits, roadmap milestones, and commercial applications.</p>
+                    </div>
+                </button>
+
+                <button class="suggestion-card text-left p-3 sm:p-4 rounded-xl sm:rounded-2xl glass-panel hover-lift flex items-start gap-3 group"
+                        data-prompt="Provide a comprehensive technical comparison of NVIDIA Blackwell architecture vs previous generations, focusing on GB200 NVLink bandwidth, FP4 precision, and power efficiency.">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                        <i data-lucide="cpu" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">NVIDIA Blackwell Architecture</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 sm:line-clamp-2">GB200 NVLink interconnect, FP4 tensor cores, and enterprise AI performance.</p>
+                    </div>
+                </button>
+
+                <button class="suggestion-card text-left p-3 sm:p-4 rounded-xl sm:rounded-2xl glass-panel hover-lift flex items-start gap-3 group"
+                        data-prompt="Research the current state of solid-state battery technology for electric vehicles in 2026: key manufacturers, energy density gains, and manufacturing hurdles.">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">Solid-State Battery Roadmap</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 sm:line-clamp-2">Lithium-metal vs silicon anodes, EV adoption timelines, and cost curve projections.</p>
+                    </div>
+                </button>
+
+                <button class="suggestion-card text-left p-3 sm:p-4 rounded-xl sm:rounded-2xl glass-panel hover-lift flex items-start gap-3 group"
+                        data-prompt="Analyze the top Python multi-agent orchestration frameworks in 2026 (LangGraph, CrewAI, AutoGen). Compare architecture, state management, and memory persistence.">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                        <i data-lucide="network" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">AI Agent Frameworks Analysis</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 sm:line-clamp-2">LangGraph vs CrewAI vs AutoGen — architecture, state checkpointers, and production trade-offs.</p>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat History Stream -->
+        <div id="chat-container" class="flex-1 flex flex-col mb-36 sm:mb-32"></div>
+        <div id="chat-bottom-anchor" class="h-4 w-full pointer-events-none"></div>
+
+
+    </main>
+
+    <!-- Floating composer moved outside <main> for reliable mobile fixed positioning -->
+        <!-- ==========================================
+            STICKY FLOATING PROMPT COMPOSER
+            Desktop + Mobile Responsive
+        =========================================== -->
+        <div class="prompt-bar-container fixed bottom-0 left-0 right-0 z-40 pointer-events-none p-2 sm:p-4 pb-3 sm:pb-6"
+             style="position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; z-index: 9999 !important; display: block !important; visibility: visible !important;">
+
+            <div class="prompt-bar-inner max-w-4xl mx-auto pointer-events-auto w-full px-1.5 sm:px-0">
+
+                <form id="chat-form"
+                    class="relative glass-input rounded-2xl p-2 sm:p-2.5 flex flex-col gap-1.5 sm:gap-2">
+
+                    <!-- Prompt Input -->
+                    <textarea
+                        id="prompt-input"
+                        rows="1"
+                        placeholder="Ask a research topic, or reply 'save as pdf / docx / markdown'..."
+                        class="w-full bg-transparent text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none resize-none px-2.5 sm:px-3 pt-1.5 max-h-36 sm:max-h-40 leading-relaxed font-normal"
+                        required></textarea>
+
+                    <!-- Bottom Toolbar -->
+                    <div class="flex items-center justify-between px-1.5 sm:px-2 pt-1 border-t border-slate-200 dark:border-white/5 text-[11px] text-slate-500 dark:text-slate-400">
+
+                        <!-- Model Capabilities -->
+                        <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
+
+                            <!-- Web Search -->
+                            <span class="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-200 transition-colors">
+                                <i data-lucide="globe-2"
+                                class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0"></i>
+
+                                <span class="hidden sm:inline">DuckDuckGo + Playwright</span>
+                                <span class="inline sm:hidden text-[10px]">Web</span>
+                            </span>
+
+                            <span class="text-slate-400 dark:text-slate-600 hidden sm:inline">•</span>
+
+                            <!-- MCP Storage -->
+                            <span class="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-200 transition-colors">
+                                <i data-lucide="hard-drive"
+                                class="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 flex-shrink-0"></i>
+
+                                <span class="hidden sm:inline">MCP Storage</span>
+                                <span class="inline sm:hidden text-[10px]">MCP</span>
+                            </span>
+
+                        </div>
+
+                        <!-- Execute Button -->
+                        <div class="flex items-center gap-2 flex-shrink-0">
+
+                            <span class="text-[10px] text-slate-400 dark:text-slate-500 hidden md:inline">
+                                Shift + Enter for new line
+                            </span>
+
+                            <button
+                                type="submit"
+                                id="send-btn"
+                                class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
+
+                                <span>Execute</span>
+
+                                <i data-lucide="arrow-up"
+                                class="w-3.5 h-3.5"></i>
+
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+
+    <!-- Backdrop for Drawers -->
+    <div id="drawer-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden opacity-0 transition-opacity duration-300"></div>
+
+    <!-- Slide-Over Conversation History Drawer (Left Side) -->
+    <aside id="history-drawer" class="theme-drawer fixed top-0 left-0 bottom-0 w-full sm:w-[380px] border-r z-50 flex flex-col transform -translate-x-full transition-transform duration-300 shadow-2xl">
+        <!-- Header -->
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <i data-lucide="messages-square" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white">Conversation History</h3>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400" id="history-drawer-subtitle">Past research sessions</p>
+                </div>
+            </div>
+            <button id="close-history-btn" class="p-1.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- New Chat Trigger in Drawer -->
+        <div class="p-3.5 border-b border-slate-200 dark:border-white/5">
+            <button id="history-new-chat-btn" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-all">
+                <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                <span>Start New Conversation</span>
+            </button>
+        </div>
+
+        <!-- Search History -->
+        <div class="px-4 py-3 border-b border-slate-200 dark:border-white/5">
+            <div class="relative">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" 
+                       id="history-search" 
+                       placeholder="Search past conversations..." 
+                       class="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors">
+            </div>
+        </div>
+
+        <!-- Conversations List -->
+        <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-1.5" id="history-list">
+            <!-- Dynamic conversations rendered by app.js -->
+        </div>
+
+        <!-- Footer -->
+        <div class="p-3.5 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/40 flex items-center justify-between text-xs">
+            <button id="clear-all-history-btn" class="text-slate-500 dark:text-slate-400 hover:text-rose-500 text-xs flex items-center gap-1.5 transition-colors">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Clear All History</span>
+            </button>
+            <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Persisted Locally</span>
+        </div>
+    </aside>
+
+    <!-- Slide-Over Reports Vault Drawer -->
+    <aside id="reports-drawer" class="theme-drawer fixed top-0 right-0 bottom-0 w-full sm:w-[450px] border-l z-50 flex flex-col transform translate-x-full transition-transform duration-300 shadow-2xl">
+        <!-- Drawer Header -->
+        <div class="px-5 py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <i data-lucide="folder-archive" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-white">Research Artifacts Vault</h3>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400" id="drawer-count-badge">Loading files...</p>
+                </div>
+            </div>
+            <button id="close-drawer-btn" class="p-1.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <div class="p-4 border-b border-slate-200 dark:border-white/5 flex flex-col gap-2.5">
+            <!-- Search -->
+            <div class="relative flex items-center">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none"></i>
+                <input type="text" 
+                       id="report-search" 
+                       placeholder="Filter reports by topic or name..." 
+                       class="w-full pl-8 pr-8 py-1.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors">
+                <button id="clear-report-search-btn" type="button" class="hidden absolute right-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-white p-0.5">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+            </div>
+
+            <!-- Format Tabs -->
+            <div class="flex items-center gap-1.5 text-xs">
+                <button type="button" class="filter-tab px-2.5 py-1 rounded-md bg-indigo-600 text-white font-semibold shadow-sm transition-all" data-filter="all">All</button>
+                <button type="button" class="filter-tab px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" data-filter="pdf">PDF</button>
+                <button type="button" class="filter-tab px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" data-filter="docx">Word</button>
+                <button type="button" class="filter-tab px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all" data-filter="md">Markdown</button>
+            </div>
+        </div>
+
+        <!-- Reports List Container -->
+        <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5" id="reports-list">
+            <!-- Dynamic reports populated by app.js -->
+        </div>
+
+        <!-- Drawer Footer Info -->
+        <div class="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-slate-950/40 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+            <span>Location: <code>research/reports/</code></span>
+            <span class="text-indigo-600 dark:text-indigo-400 font-medium">MCP Managed</span>
+        </div>
+    </aside>
+
+    <!-- Markdown Report Full-Screen Preview Modal -->
+    <div id="preview-modal" class="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-md z-50 hidden items-center justify-center p-2.5 sm:p-4">
+        <div class="glass-panel w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+            <!-- Modal Header -->
+            <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-100 dark:bg-slate-900/80">
+                <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-500/20 text-violet-600 dark:text-violet-400 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate" id="preview-title">Document Preview</h3>
+                        <p class="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400">Rendered Markdown Report</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a id="preview-download-btn" href="#" download class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span class="hidden sm:inline">Download</span>
+                    </a>
+                    <button id="close-preview-btn" class="p-1.5 rounded-lg bg-slate-200 dark:bg-white/5 hover:bg-slate-300 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6 bg-white dark:bg-[#090d16]">
+                <div id="preview-content" class="prose-report max-w-none">
+                    <!-- Markdown Content Here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App JavaScript (with cache-buster) -->
+    <script src="{% static 'js/app.js' %}?v=3.5"></script>
+    <script>
+        // Initialize Lucide icons on load
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
