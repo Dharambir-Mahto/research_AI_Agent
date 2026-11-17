@@ -203,7 +203,7 @@ async def initialize_agent():
 
     summarizer = SummarizationMiddleware(
         model=llm,
-        trigger=("tokens", 1024),   # 1024 tokens cross ho to summarize kare
+        trigger=("tokens", 4000),   # 4000 tokens cross ho to summarize kare
         keep=("messages", 5),       # recent 5 messages rakhe
     )
 
