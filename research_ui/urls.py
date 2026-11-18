@@ -23,4 +23,9 @@ urlpatterns = [
     path("api/conversations/clear/", views.conversations_clear_api, name="conversations_clear"),
     path("api/conversations/<str:conv_id>/", views.conversation_detail_api, name="conversation_detail"),
     path("api/conversations/<str:conv_id>/delete/", views.conversation_delete_api, name="conversation_delete"),
+    path("api/conversations/<str:conv_id>/message/edit/", views.conversation_edit_message_api, name="conversation_edit_message"),
+    path("api/upload/", views.upload_file_api, name="upload_file"),
+    path("api/uploads/", views.uploads_list_api, name="uploads_list"),
+    path("api/uploads/download/<path:relpath>", views.download_upload_file, name="download_upload_file"),
+    path("api/uploads/preview/<path:relpath>", views.preview_upload_file, name="preview_upload_file"),
 ]

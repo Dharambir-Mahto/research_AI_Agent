@@ -1,13 +1,39 @@
-Core agent framework
-langchain langgraph langchain-google-genai langchain-mcp-adapters
-Browser automation
+# Core Agent & LLM Framework
+langchain
+langchain-core
+langchain-google-genai
+langchain-mcp-adapters
+langgraph
+google-genai
+
+# Web Framework & Interface
+Django
+asgiref
+sqlparse
+
+# Document Processing & Operations
+PyMuPDF
+python-docx
+reportlab
+pypdf
+pdf2docx
+Markdown
+Pillow
+
+# Browser Automation & Web Research
 playwright
-Web search
-Environment variables
+ddgs
+aiohttp
+mcp
+
+# Environment & Utilities
 python-dotenv
-neurotrace
+pydantic
+pydantic-settings
+
+# Memory & Tracing
 chromadb
 langchain-chroma
 neo4j
 langchain-neo4j
-
+neurotrace

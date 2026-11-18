@@ -1,60 +1,111 @@
-# 🌐 OmniResearch AI — Autonomous Web Intelligence & Executive Reporting Agent
+# 🌐 OmniResearch AI — Dual-Agent Intelligence, Autonomous Web Research & Document Code Execution
 
-An intelligent, autonomous multi-tool AI Research Agent powered by **LangChain**, **LangGraph**, **Google Gemini**, **Playwright**, and **MCP (Model Context Protocol)**. Equipped with an ultra-premium, modern **Django Web Interface** featuring Dark & Light mode, full Conversation History persistence, a Research Artifacts Vault, and executive document exports in **PDF, Word (.docx), and Markdown**.
-
----
-
-## ✨ Features & Highlights
-
-### 🧠 Autonomous Research Agent
-- **Live Web Scraping & Search**: Autonomous headless browser discovery powered by Playwright and DuckDuckGo for real-time information retrieval.
-- **Deep Reasoning & Fact Verification**: Multi-step intent analysis, tool execution, and context cross-referencing powered by Gemini models.
-- **Perplexity-Style Source Pill**: Compact citation capsule with site favicons and an expandable grid of source cards.
-- **MCP Storage Management**: Integrated Model Context Protocol architecture for standardized tool interaction and artifact tracking.
-- **Multi-Format Document Export**: Save executive research dossiers instantly into **PDF**, **Microsoft Word (.docx)**, or **Markdown (.md)**.
-
-### 🎨 Ultra-Premium Modern Frontend (Django)
-- **Multi-Theme Support**: Dark Mode and Executive Light Mode with persistent localStorage preference and zero flash of unstyled content (FOUC).
-- **Universal Quantum Neural Loader**: Unified spinning quantum rings and neural frequency wave animations with live elapsed execution timers.
-- **Conversation History Drawer**: Slide-over drawer with thread auto-titling, search, history switching, and local persistence (`research/conversations.json`).
-- **Research Artifacts Vault**: Dedicated drawer to browse generated reports with format filtering tabs (**All**, **PDF**, **Word**, **Markdown**) and real-time filename search.
-- **Interactive Markdown Preview**: Full-screen modal to read and syntax-highlight reports directly inside the browser before downloading.
-- **100% Mobile & Desktop Responsive**: Optimized touch interaction, safe-area padding for notch/home-bars, and responsive layouts across all viewport sizes.
+An enterprise-grade, dual-agent AI research and document automation platform powered by **LangChain**, **LangGraph**, **Google Gemini**, **Playwright**, and **MCP (Model Context Protocol)**. Equipped with an ultra-premium, modern **Django Web Interface** featuring Dark & Light mode, full Conversation History persistence, an Artifacts Vault, multi-file drag-and-drop, interactive document previews, and automated Python script generation and execution.
 
 ---
 
-## 🏗️ Project Architecture
+## ✨ System Architecture & Highlights
+
+### 🤖 Dual-Agent Collaborative System
+
+```
+                      ┌───────────────────────────────────────┐
+                      │        User Query / File Upload       │
+                      └──────────────────┬────────────────────┘
+                                         │
+                         ┌───────────────▼───────────────┐
+                         │   4-Tier Intent & Context     │
+                         │       Router (main_agent)     │
+                         └───────┬───────────────┬───────┘
+                                 │               │
+                 [Web Research Intent]       [Document Operation Intent]
+                                 │               │
+                                 ▼               ▼
+         ┌───────────────────────────────┐   ┌───────────────────────────────┐
+         │          Main Agent           │   │        Document Agent         │
+         │      (Web Intelligence)       │   │   (Code Gen & Execution)      │
+         ├───────────────────────────────┤   ├───────────────────────────────┤
+         │ • DuckDuckGo Search           │   │ • Dynamic Script Generation   │
+         │ • Playwright DOM Crawler      │   │ • doc_scripts/ Script Re-use  │
+         │ • Perplexity-Style Citations  │   │ • Subprocess Code Execution   │
+         │ • PDF / DOCX / MD Exporter    │   │ • PDF / DOCX / Text Transform │
+         └───────────────────────────────┘   └───────────────────────────────┘
+                                 │               │
+                                 ▼               ▼
+                      ┌───────────────────────────────────────┐
+                      │     Django Single-Page Interface      │
+                      │ • Interactive In-Modal Document Viewer│
+                      │ • One-Click Download & Preview Cards  │
+                      │ • Research Artifacts Vault (All/Tabs) │
+                      │ • Multi-File Drag & Drop Composer     │
+                      └───────────────────────────────────────┘
+```
+
+1. **Main Agent (Autonomous Web Research)**:
+   - **Deep Web Crawling**: Autonomous headless browser discovery powered by Playwright and DuckDuckGo for live, un-truncated full-text extraction.
+   - **Evidence Verification**: Multi-perspective fact verification, cross-referencing, and structured executive synthesis.
+   - **Perplexity-Style Source Pills**: Compact source pills displaying website count, site favicons, and an expandable grid of reference cards.
+   - **Executive Report Exporter**: Direct saving to **PDF**, **Microsoft Word (.docx)**, or **Markdown (.md)**.
+
+2. **Document Agent (Code Generation & Execution)**:
+   - **Autonomous Python Script Generation**: Analyzes document operation prompts, generates standalone Python code, and persists scripts into `doc_scripts/`.
+   - **Intelligent Script Reuse**: Checks `doc_scripts/` first. If a pre-built or previously generated script exists (`remove_pages.py`, `revert_pages.py`, `edit_text.py`, `convert_document.py`, `add_signature.py`), it reuses it via `run_saved_script` rather than duplicating code.
+   - **Multi-Document Operations**: Merging multiple PDFs, deleting/trimming pages, restoring/reverting pages from originals, text find-and-replace, format conversions, and digital signature placement.
+   - **Clean Output & Zero-Path Leakage**: Automatically presents **Preview** and **Download File** cards without exposing internal filesystem paths or raw links.
+
+---
+
+## 🎨 Ultra-Premium Django Web Interface
+
+- **Multi-File Upload & Drag-and-Drop**: Drag multiple files directly into the composer or use the multi-select file picker; interactive file chips display names, file sizes, and individual remove buttons.
+- **In-Place Chat Context Editing**: Hover and click **Edit** on any user prompt to edit instructions in-place, dispatching an immediate in-place regeneration without cluttering thread history.
+- **Interactive Full-Screen Preview Modal**: Built-in modal viewer to preview PDFs, images, and text documents natively in the browser without downloading.
+- **Research Artifacts Vault**: Slide-over drawer indexing all generated research dossiers and uploaded/processed documents with format filtering tabs (**All**, **PDF**, **Word**, **Markdown**, **Uploads**) and live search.
+- **Conversation History Drawer**: Persistent thread management with auto-titling, thread switching, local JSON storage, and full deletion controls.
+- **Adaptive Dark / Light Themes**: Instant theme toggle with localStorage persistence and zero flash of unstyled content (FOUC).
+
+---
+
+## 🏗️ Project Structure
 
 ```
 AI-Agent/
-├── agent.py                 # Core LangChain/LangGraph agent logic & prompts
-├── browser_tools.py         # Playwright headless browser & document conversion tools
-├── mcp_manager.py           # Model Context Protocol filesystem & artifact tools
-├── manage.py                # Django CLI entrypoint
-├── requirements.txt         # Project dependencies
-├── .env.example             # Environment variables template
-├── .gitignore               # Git ignore rules for virtualenvs, keys, & outputs
+├── main_agent.py              # Primary research agent, intent router & CLI entrypoint
+├── document_agent.py          # Document Code Generation & Execution Agent (2nd Agent)
+├── browser_tools.py           # Playwright headless browser & document exporter tools
+├── mcp_manager.py             # Model Context Protocol hub & dynamic filesystem tools
+├── manage.py                  # Django CLI management entrypoint
+├── requirements.txt           # Unified project dependencies
+├── .env.example               # Environment variables template
 │
-├── web_config/              # Django Project Configuration
-│   ├── settings.py          # Django settings, staticfiles, & PKG paths
-│   ├── urls.py              # Root URL router
-│   └── wsgi.py              # WSGI server entrypoint
+├── doc_scripts/               # Persistent Python scripts for document operations
+│   ├── remove_pages.py        # PDF page trimming / deletion
+│   ├── revert_pages.py        # PDF page restoration / recovery from originals
+│   ├── edit_text.py           # Text find-and-replace in PDF and DOCX
+│   ├── convert_document.py    # Conversion between PDF, DOCX, and Markdown
+│   └── add_signature.py       # Digital signature stamping
 │
-├── research_ui/             # Django Frontend & REST API App
-│   ├── views.py             # Chat streaming, reports preview, conversation history APIs
-│   ├── urls.py              # API & UI endpoints
+├── web_config/                # Django Project Configuration
+│   ├── settings.py            # Django configuration, static paths, and pkgs integration
+│   ├── urls.py                # Root router
+│   └── wsgi.py                # WSGI application entrypoint
+│
+├── research_ui/               # Django Web Application & REST API
+│   ├── views.py               # Chat streaming, upload handlers, preview views, vault APIs
+│   ├── urls.py                # URL endpoints
 │   ├── templates/
 │   │   └── research_ui/
-│   │       └── index.html   # Primary single-page web application
+│   │       └── index.html     # Single-page application interface
 │   └── static/
 │       ├── css/
-│       │   └── styles.css   # Custom styling, quantum animations, & theme tokens
+│       │   └── styles.css     # Quantum animations, theme variables, and responsive design
 │       └── js/
-│           └── app.js       # Vanilla ES6 client logic, drawers, marked.js integration
+│           └── app.js         # Client logic, drag-and-drop, drawers, in-place edit & marked.js
 │
-└── research/                # Dynamic Agent Storage
-    ├── conversations.json   # Persisted chat threads & history
-    └── reports/             # Generated PDFs, DOCX, and Markdown artifacts
+├── uploads/                   # User uploaded documents and processed document outputs
+└── research/                  # Research storage
+    ├── conversations.json     # Persisted chat threads & message histories
+    └── reports/               # Generated PDF, DOCX, and Markdown research dossiers
 ```
 
 ---
@@ -63,7 +114,7 @@ AI-Agent/
 
 ### 1. Prerequisites
 - **Python 3.10+**
-- **Google Gemini API Key** (Get one at [Google AI Studio](https://aistudio.google.com/))
+- **Google Gemini API Key** (obtain from [Google AI Studio](https://aistudio.google.com/))
 
 ### 2. Installation
 
@@ -86,7 +137,7 @@ playwright install chromium
 
 ### 3. Environment Configuration
 
-Copy the example environment file and insert your API keys:
+Copy the example environment file and configure your keys:
 
 ```bash
 cp .env.example .env
@@ -97,16 +148,13 @@ Edit `.env`:
 GEMINI_API_KEY=your_gemini_api_key_here
 GOOGLE_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-flash-lite-latest
-TAVILY_API_KEY=your_tavily_api_key_here  # Optional
 ```
 
 ---
 
 ## 💻 Running the Application
 
-### Launch the Web Application (Recommended)
-Run the Django development server:
-
+### Launch the Web Interface (Recommended)
 ```bash
 python manage.py runserver
 ```
@@ -116,11 +164,10 @@ Open your browser and navigate to:
 http://127.0.0.1:8000/
 ```
 
-### Running the Agent via CLI (Headless Mode)
-You can also run the agent directly from the terminal without the web UI:
-
+### Running via CLI
+Run the interactive CLI agent directly:
 ```bash
-python agent.py
+python main_agent.py
 ```
 
 ---
@@ -130,27 +177,34 @@ python agent.py
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/` | `GET` | Main Web Application UI |
-| `/api/chat/` | `POST` | Execute agent research query / export commands |
-| `/api/reports/` | `GET` | List all files in the Research Artifacts Vault |
-| `/api/reports/download/<path>` | `GET` | Download a generated report |
-| `/api/reports/preview/<path>` | `GET` | Get text content of a markdown report for modal preview |
-| `/api/conversations/` | `GET` | List past conversation threads |
-| `/api/conversations/<id>/` | `GET` | Fetch specific conversation thread |
-| `/api/conversations/<id>/delete/` | `POST` | Delete a single conversation thread |
+| `/api/chat/` | `POST` | Dispatches research query or document code operation |
+| `/api/upload/` | `POST` | Upload single or multiple files (`multipart/form-data`) |
+| `/api/uploads/` | `GET` | List all uploaded and processed document artifacts |
+| `/api/uploads/download/<path>` | `GET` | Download processed document from `uploads/` |
+| `/api/uploads/preview/<path>` | `GET` | Stream document inline for browser/modal preview |
+| `/api/reports/` | `GET` | List all generated research dossiers in the vault |
+| `/api/reports/download/<path>` | `GET` | Download a generated research dossier |
+| `/api/reports/preview/<path>` | `GET` | Fetch Markdown report content for previewing |
+| `/api/conversations/` | `GET` | List all saved conversation sessions |
+| `/api/conversations/<id>/` | `GET` | Fetch full message history for a conversation |
+| `/api/conversations/<id>/delete/`| `POST` | Delete a single conversation thread |
 | `/api/conversations/clear/` | `POST` | Clear all conversation history |
-| `/api/reset/` | `POST` | Reset current memory checkpoint for a new session |
-| `/api/status/` | `GET` | Agent healthcheck and model runtime status |
+| `/api/conversations/<id>/message/edit/` | `POST` | Update a specific message in-place |
+| `/api/status/` | `GET` | System health check and model runtime status |
+| `/api/reset/` | `POST` | Reset current memory checkpoint for a clean session |
 
 ---
 
-## 📄 Exporting Reports
+## 📄 Document Operations Quick Reference
 
-While chatting with the agent, simply type or click any of the export commands:
-- `save as pdf` — Generates a professionally styled PDF document in `research/reports/`.
-- `save as docx` (or `save as word`) — Generates a Microsoft Word document.
-- `save as markdown` — Saves a clean GitHub-flavored Markdown file.
-
-All files are automatically indexed in the **Report Vault** drawer for instant download or in-browser preview.
+You can perform any of the following operations through natural language:
+- **Merge Documents**: *"Merge these 3 PDFs into a single report"* (attach or drag files).
+- **Remove Pages**: *"Remove page 3 and page 5 from this PDF"*.
+- **Restore / Revert Pages**: *"Revert back page 3"* (automatically restores from original).
+- **Find & Replace**: *"Rename 'Old Company' to 'New Company' across the document"*.
+- **Convert Formats**: *"Convert this PDF into Word format (.docx)"*.
+- **Apply Signatures**: *"Stamp my uploaded signature on page 1 at the bottom right"*.
+- **Custom Scripts**: *"Generate a python script to rotate all landscape pages to portrait"*.
 
 ---
 

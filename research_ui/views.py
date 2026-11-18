@@ -2,6 +2,7 @@ import asyncio
 import json
 import mimetypes
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -9,18 +10,27 @@ from django.http import JsonResponse, FileResponse, Http404
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
-# Import from existing agent.py directly without any modifications to agent.py
-from agent import (
+# Import from main_agent
+from main_agent import (
     initialize_agent,
     ask_gemini,
     _safe_cleanup,
     RESEARCH_DIR,
     REPORT_DIR,
     MODEL,
+    UPLOAD_DIR,
+    llm,
+    _extract_file,
+    _extract_text,
+    is_document_intent,
+    _get_latest_upload_file,
 )
 
-# Global singleton agent instance with asyncio lock
+# Global singleton agent instances with asyncio lock
 _agent_instance = None
+_checkpointer = None
+_store = None
+_doc_agent_instance = None
 _agent_lock = asyncio.Lock()
 
 CONVERSATIONS_FILE = RESEARCH_DIR / "conversations.json"
@@ -49,14 +59,40 @@ def _save_conversations(data):
 
 async def get_or_create_agent():
     """Lazily initialize the agent once and keep it ready for fast requests."""
-    global _agent_instance
+    global _agent_instance, _checkpointer, _store
     if _agent_instance is not None:
         return _agent_instance
 
     async with _agent_lock:
         if _agent_instance is None:
-            _agent_instance = await initialize_agent()
+            res = await initialize_agent()
+            if isinstance(res, tuple):
+                _agent_instance, _checkpointer, _store = res
+            else:
+                _agent_instance = res
         return _agent_instance
+
+
+async def get_or_create_doc_agent():
+    """Lazily initialize the Document Operations Agent when needed."""
+    global _doc_agent_instance, _checkpointer, _store
+    if _doc_agent_instance is not None:
+        return _doc_agent_instance
+
+    if _checkpointer is None:
+        from langgraph.checkpoint.memory import InMemorySaver
+        _checkpointer = InMemorySaver()
+    if _store is None:
+        from langgraph.store.memory import InMemoryStore
+        _store = InMemoryStore()
+
+    from document_agent import create_document_agent
+    _doc_agent_instance = create_document_agent(
+        llm=llm,
+        checkpointer=_checkpointer,
+        store=_store,
+    )
+    return _doc_agent_instance
 
 
 def index(request):
@@ -64,6 +100,7 @@ def index(request):
     context = {
         "model_name": MODEL,
         "research_dir": str(RESEARCH_DIR),
+        "upload_dir": str(UPLOAD_DIR),
     }
     return render(request, "research_ui/index.html", context)
 
@@ -121,14 +158,58 @@ def reports_api(request):
     return JsonResponse({"status": "success", "reports": reports, "count": len(reports)})
 
 
-def download_report(request, relpath):
-    """Safely stream a generated report file for download."""
-    safe_base = REPORT_DIR.resolve()
-    target_path = (REPORT_DIR / relpath).resolve()
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-    # Security check: prevent directory traversal outside REPORT_DIR
-    if not str(target_path).startswith(str(safe_base)) or not target_path.is_file():
-        raise Http404("Report not found or invalid path.")
+
+def _find_file_safely(relpath: str) -> Path | None:
+    """Safely locate a file across allowed directories (REPORT_DIR, UPLOAD_DIR, RESEARCH_DIR, BASE_DIR)."""
+    if not relpath:
+        return None
+    relpath_clean = relpath.strip().lstrip("/\\")
+    fname = Path(relpath_clean).name
+
+    candidates = []
+
+    # 1. Check in UPLOAD_DIR
+    if relpath_clean.startswith("uploads/") or relpath_clean.startswith("uploads\\"):
+        candidates.append(UPLOAD_DIR / relpath_clean[8:])
+    candidates.append(UPLOAD_DIR / fname)
+    candidates.append(UPLOAD_DIR / relpath_clean)
+
+    # 2. Check in REPORT_DIR
+    candidates.append(REPORT_DIR / relpath_clean)
+    candidates.append(REPORT_DIR / fname)
+
+    # 3. Check in RESEARCH_DIR
+    candidates.append(RESEARCH_DIR / relpath_clean)
+    candidates.append(RESEARCH_DIR / fname)
+
+    # 4. Check relative to BASE_DIR
+    candidates.append(BASE_DIR / relpath_clean)
+
+    allowed_bases = [
+        REPORT_DIR.resolve(),
+        UPLOAD_DIR.resolve(),
+        RESEARCH_DIR.resolve(),
+        BASE_DIR.resolve(),
+    ]
+
+    for cand in candidates:
+        try:
+            cand_res = cand.resolve()
+            if cand_res.is_file():
+                if any(str(cand_res).startswith(str(base)) for base in allowed_bases):
+                    return cand_res
+        except Exception:
+            continue
+    return None
+
+
+def download_report(request, relpath):
+    """Safely stream a generated report or processed document for download."""
+    target_path = _find_file_safely(relpath)
+    if not target_path or not target_path.is_file():
+        raise Http404(f"File not found or invalid path: {relpath}")
 
     content_type, _ = mimetypes.guess_type(str(target_path))
     if not content_type:
@@ -141,10 +222,8 @@ def download_report(request, relpath):
 
 def preview_report(request, relpath):
     """Return text content of a report for previewing (e.g. Markdown)."""
-    safe_base = REPORT_DIR.resolve()
-    target_path = (REPORT_DIR / relpath).resolve()
-
-    if not str(target_path).startswith(str(safe_base)) or not target_path.is_file():
+    target_path = _find_file_safely(relpath)
+    if not target_path or not target_path.is_file():
         return JsonResponse({"status": "error", "message": "File not found"}, status=404)
 
     ext = target_path.suffix.lower()
@@ -167,7 +246,7 @@ def preview_report(request, relpath):
             "filename": target_path.name,
             "is_text": False,
             "format": ext.lstrip("."),
-            "download_url": f"/api/reports/download/{relpath}",
+            "download_url": f"/api/reports/download/{target_path.name}",
         })
 
 
@@ -240,8 +319,163 @@ def conversations_clear_api(request):
 
 
 @csrf_exempt
+def conversation_edit_message_api(request, conv_id):
+    """Update a specific message's content in a saved conversation."""
+    if request.method not in ["POST", "PATCH"]:
+        return JsonResponse({"status": "error", "message": "Method not allowed"}, status=405)
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        msg_id = data.get("message_id")
+        old_content = data.get("old_content")
+        new_content = (data.get("content") or "").strip()
+        if not new_content:
+            return JsonResponse({"status": "error", "message": "Content cannot be empty"}, status=400)
+
+        convs = _load_conversations()
+        if conv_id not in convs:
+            return JsonResponse({"status": "error", "message": "Conversation not found"}, status=404)
+
+        updated = False
+        for msg in convs[conv_id].get("messages", []):
+            if (msg_id and msg.get("id") == msg_id) or (old_content and msg.get("content") == old_content):
+                msg["content"] = new_content
+                updated = True
+                break
+
+        if updated:
+            convs[conv_id]["updated_at"] = datetime.now().isoformat()
+            _save_conversations(convs)
+            return JsonResponse({"status": "success", "message": "Message content updated"})
+        return JsonResponse({"status": "error", "message": "Message not found"}, status=404)
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+@csrf_exempt
+def upload_file_api(request):
+    """Handle document or signature file uploads into uploads/ directory (single or multiple)."""
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "POST required"}, status=405)
+
+    files = request.FILES.getlist("files") or request.FILES.getlist("file")
+    if not files:
+        single = request.FILES.get("file")
+        if single:
+            files = [single]
+
+    if not files:
+        return JsonResponse({"status": "error", "message": "No file provided"}, status=400)
+
+    allowed = {".pdf", ".docx", ".doc", ".md", ".txt", ".png", ".jpg", ".jpeg"}
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    saved_files = []
+
+    for uploaded_file in files:
+        orig_name = Path(uploaded_file.name).name
+        clean_name = re.sub(r"[^\w.\-]", "_", orig_name)
+        ext = Path(clean_name).suffix.lower()
+        if ext not in allowed:
+            continue
+
+        target_path = UPLOAD_DIR / clean_name
+        try:
+            with open(target_path, "wb") as f:
+                for chunk in uploaded_file.chunks():
+                    f.write(chunk)
+
+            stat = target_path.stat()
+            size_bytes = stat.st_size
+            if size_bytes < 1024:
+                size_human = f"{size_bytes} B"
+            elif size_bytes < 1024 * 1024:
+                size_human = f"{size_bytes / 1024:.1f} KB"
+            else:
+                size_human = f"{size_bytes / (1024 * 1024):.1f} MB"
+
+            saved_files.append({
+                "filename": clean_name,
+                "filepath": f"uploads/{clean_name}",
+                "size_human": size_human,
+                "format": ext.lstrip("."),
+                "download_url": f"/api/uploads/download/{clean_name}",
+            })
+        except Exception:
+            continue
+
+    if not saved_files:
+        return JsonResponse({"status": "error", "message": "No valid files uploaded"}, status=400)
+
+    first = saved_files[0]
+    return JsonResponse({
+        "status": "success",
+        "files": saved_files,
+        "count": len(saved_files),
+        "filename": first["filename"],
+        "filepath": first["filepath"],
+        "size_human": first["size_human"],
+        "format": first["format"],
+        "download_url": first["download_url"],
+    })
+
+
+def download_upload_file(request, relpath):
+    """Safely stream a file from uploads/ or processed documents for download."""
+    target_path = _find_file_safely(relpath)
+    if not target_path or not target_path.is_file():
+        raise Http404(f"File not found: {relpath}")
+
+    content_type, _ = mimetypes.guess_type(str(target_path))
+    if not content_type:
+        content_type = "application/octet-stream"
+
+    response = FileResponse(open(target_path, "rb"), content_type=content_type)
+    response["Content-Disposition"] = f'attachment; filename="{target_path.name}"'
+    return response
+
+
+def preview_upload_file(request, relpath):
+    """Safely stream an upload/processed file inline for browser preview."""
+    target_path = _find_file_safely(relpath)
+    if not target_path or not target_path.is_file():
+        raise Http404(f"File not found: {relpath}")
+
+    content_type, _ = mimetypes.guess_type(str(target_path))
+    if not content_type:
+        content_type = "application/pdf" if target_path.suffix.lower() == ".pdf" else "application/octet-stream"
+
+    response = FileResponse(open(target_path, "rb"), content_type=content_type)
+    response["Content-Disposition"] = f'inline; filename="{target_path.name}"'
+    return response
+
+
+def uploads_list_api(request):
+    """List all uploaded / converted / signed / edited documents in uploads/."""
+    files = []
+    if UPLOAD_DIR.exists():
+        for f in UPLOAD_DIR.glob("*"):
+            if f.is_file() and not f.name.startswith("."):
+                try:
+                    stat = f.stat()
+                    size_b = stat.st_size
+                    size_h = f"{size_b} B" if size_b < 1024 else (f"{size_b/1024:.1f} KB" if size_b < 1024*1024 else f"{size_b/(1024*1024):.1f} MB")
+                    files.append({
+                        "filename": f.name,
+                        "filepath": f"uploads/{f.name}",
+                        "format": f.suffix.lstrip(".").lower(),
+                        "size_human": size_h,
+                        "modified_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        "modified_formatted": datetime.fromtimestamp(stat.st_mtime).strftime("%b %d · %H:%M"),
+                        "download_url": f"/api/uploads/download/{f.name}",
+                    })
+                except Exception:
+                    continue
+    files.sort(key=lambda x: x.get("modified_iso", ""), reverse=True)
+    return JsonResponse({"status": "success", "files": files, "count": len(files)})
+
+
+@csrf_exempt
 async def chat_api(request):
-    """Handles chat research queries, save commands, and persistent session history."""
+    """Handles chat research queries, document agent operations, and persistent session history."""
     if request.method != "POST":
         return JsonResponse({"status": "error", "message": "POST required"}, status=405)
 
@@ -253,6 +487,10 @@ async def chat_api(request):
     prompt = (data.get("prompt") or "").strip()
     last_report = data.get("last_report") or None
     conv_id = (data.get("conversation_id") or "").strip()
+    file_paths = data.get("file_paths") or []
+    file_path = _extract_file(prompt) or (data.get("file_path") or "").strip()
+    if not file_path and file_paths:
+        file_path = file_paths[0]
 
     if not prompt:
         return JsonResponse({"status": "error", "message": "Prompt cannot be empty"}, status=400)
@@ -260,9 +498,50 @@ async def chat_api(request):
     if not conv_id:
         conv_id = f"conv_{int(datetime.now().timestamp() * 1000)}"
 
+    convs = _load_conversations()
+    conv_record = convs.get(conv_id, {})
+    active_doc = conv_record.get("active_document") or (data.get("active_document") or "").strip() or None
+
+    is_doc_by_file = bool(
+        file_path
+        and file_path.lower().endswith(
+            (".pdf", ".docx", ".doc", ".md", ".txt", ".png", ".jpg", ".jpeg")
+        )
+    )
+    is_doc_by_intent = is_document_intent(
+        prompt,
+        has_last_report=bool(last_report),
+        has_active_doc=bool(active_doc),
+    )
+    is_doc_task = is_doc_by_file or is_doc_by_intent
+
+    target_doc = None
     try:
-        agent = await get_or_create_agent()
-        response_text = await ask_gemini(prompt, agent, last_report)
+        if is_doc_task:
+            if file_path:
+                target_doc = file_path
+            elif active_doc and _find_file_safely(active_doc):
+                target_doc = active_doc
+            else:
+                target_doc = _get_latest_upload_file()
+
+            if not target_doc:
+                response_text = "No active document found in this session. Please upload a document or attach a file first to perform document operations."
+            else:
+                doc_agent = await get_or_create_doc_agent()
+                if len(file_paths) > 1:
+                    joined = ", ".join(file_paths)
+                    effective_prompt = f"Target Documents: {joined}\nInstruction: {prompt}"
+                else:
+                    effective_prompt = prompt if (target_doc in prompt) else f"Target Document: {target_doc}\nInstruction: {prompt}"
+                response = await doc_agent.ainvoke(
+                    {"messages": [{"role": "user", "content": effective_prompt}]},
+                    config={"configurable": {"thread_id": f"doc-{conv_id}"}},
+                )
+                response_text = _extract_text(response["messages"][-1].content)
+        else:
+            agent = await get_or_create_agent()
+            response_text = await ask_gemini(prompt, agent, last_report)
 
         # Check if this was a save confirmation
         stripped = response_text.lstrip()
@@ -275,12 +554,69 @@ async def chat_api(request):
             if len(parts) > 1:
                 saved_path = parts[1].strip()
 
+        # Document Operation result detection
+        is_doc_result = False
+        doc_action = None
+        doc_path = None
+        doc_filename = None
+        for prefix, action_name in [
+            ("EDITED:", "edit"),
+            ("REMOVED:", "remove_pages"),
+            ("SIGNED:", "sign"),
+            ("CONVERTED:", "convert"),
+            ("MERGED:", "merge"),
+            ("SAVED: uploads/", "save"),
+            ("SAVED:", "save"),
+        ]:
+            if prefix in response_text:
+                parts = response_text.split(prefix, 1)
+                candidate_path = parts[1].strip().splitlines()[0].strip().strip("`*\"'")
+                if any(candidate_path.lower().endswith(ext) for ext in [".pdf", ".docx", ".doc", ".md", ".txt"]):
+                    is_doc_result = True
+                    doc_action = action_name if action_name != "save" else "edit"
+                    doc_path = candidate_path
+                    doc_filename = Path(doc_path).name
+                    break
+
+        if not is_doc_result and is_doc_task:
+            found_docs = re.findall(
+                r"\b(?:uploads/)?([a-zA-Z0-9_\-.]+\.(?:pdf|docx|doc|md|txt))\b",
+                response_text,
+                re.IGNORECASE,
+            )
+            for doc_name in reversed(found_docs):
+                cand = UPLOAD_DIR / doc_name
+                if cand.is_file():
+                    is_doc_result = True
+                    doc_filename = doc_name
+                    doc_path = f"uploads/{doc_name}"
+                    break
+
+            if not is_doc_result:
+                latest = _get_latest_upload_file()
+                if latest:
+                    is_doc_result = True
+                    doc_path = latest
+                    doc_filename = Path(latest).name
+
+        if is_doc_result and not doc_action and doc_filename:
+            prefix = doc_filename.split("_")[0].lower()
+            action_map = {
+                "trimmed": "remove_pages",
+                "removed": "remove_pages",
+                "signed": "sign",
+                "converted": "convert",
+                "merged": "merge",
+                "split": "split",
+                "reverted": "edit",
+            }
+            doc_action = action_map.get(prefix, "edit")
+
         # Save conversation history to JSON
         now_dt = datetime.now()
         now_iso = now_dt.isoformat()
         now_time = now_dt.strftime("%I:%M %p")
 
-        convs = _load_conversations()
         if conv_id not in convs:
             clean_title = prompt.replace("\n", " ").strip()
             if len(clean_title) > 38:
@@ -290,30 +626,90 @@ async def chat_api(request):
                 "title": clean_title,
                 "created_at": now_iso,
                 "updated_at": now_iso,
-                "last_report": response_text if not is_saved else (last_report or None),
+                "last_report": response_text if (not is_saved and not is_doc_result) else (last_report or None),
+                "active_document": None,
                 "messages": [],
             }
 
         conv_record = convs[conv_id]
         conv_record["updated_at"] = now_iso
-        if not is_saved and not is_save_failed:
+        if not is_saved and not is_save_failed and not is_doc_result:
             conv_record["last_report"] = response_text
 
-        conv_record["messages"].append({
-            "id": f"msg_u_{int(now_dt.timestamp()*1000)}",
-            "role": "user",
-            "content": prompt,
-            "timestamp": now_time,
-        })
+        # Update active document in conversation state
+        if doc_path:
+            conv_record["active_document"] = doc_path
+        elif is_doc_task and target_doc:
+            conv_record["active_document"] = target_doc
+        elif file_path:
+            conv_record["active_document"] = file_path
 
-        conv_record["messages"].append({
-            "id": f"msg_a_{int(now_dt.timestamp()*1000)}",
-            "role": "assistant",
-            "content": response_text,
-            "is_saved": is_saved,
-            "saved_path": saved_path,
-            "timestamp": now_time,
-        })
+        edit_msg_id = data.get("edit_message_id")
+        is_edit = bool(data.get("is_edit") or edit_msg_id)
+
+        replaced = False
+        if is_edit:
+            messages = conv_record.get("messages", [])
+            target_idx = -1
+            for idx, m in enumerate(messages):
+                if edit_msg_id and m.get("id") == edit_msg_id:
+                    target_idx = idx
+                    break
+            if target_idx == -1 and messages:
+                for idx in range(len(messages) - 1, -1, -1):
+                    if messages[idx].get("role") == "user":
+                        target_idx = idx
+                        break
+
+            if target_idx != -1:
+                messages[target_idx]["content"] = prompt
+                messages[target_idx]["timestamp"] = now_time
+                assistant_idx = target_idx + 1
+                new_assistant_msg = {
+                    "id": f"msg_a_{int(now_dt.timestamp()*1000)}",
+                    "role": "assistant",
+                    "content": response_text,
+                    "is_saved": is_saved,
+                    "saved_path": saved_path,
+                    "is_doc_task": is_doc_task,
+                    "is_document_agent": is_doc_task,
+                    "is_doc_result": is_doc_result,
+                    "doc_action": doc_action,
+                    "doc_filename": doc_filename,
+                    "download_url": f"/api/uploads/download/{doc_filename}" if doc_filename else None,
+                    "timestamp": now_time,
+                }
+                if assistant_idx < len(messages) and messages[assistant_idx].get("role") == "assistant":
+                    new_assistant_msg["id"] = messages[assistant_idx].get("id", new_assistant_msg["id"])
+                    messages[assistant_idx] = new_assistant_msg
+                    conv_record["messages"] = messages[: assistant_idx + 1]
+                else:
+                    messages.insert(assistant_idx, new_assistant_msg)
+                    conv_record["messages"] = messages[: assistant_idx + 1]
+                replaced = True
+
+        if not replaced:
+            conv_record["messages"].append({
+                "id": f"msg_u_{int(now_dt.timestamp()*1000)}",
+                "role": "user",
+                "content": prompt,
+                "timestamp": now_time,
+            })
+
+            conv_record["messages"].append({
+                "id": f"msg_a_{int(now_dt.timestamp()*1000)}",
+                "role": "assistant",
+                "content": response_text,
+                "is_saved": is_saved,
+                "saved_path": saved_path,
+                "is_doc_task": is_doc_task,
+                "is_document_agent": is_doc_task,
+                "is_doc_result": is_doc_result,
+                "doc_action": doc_action,
+                "doc_filename": doc_filename,
+                "download_url": f"/api/uploads/download/{doc_filename}" if doc_filename else None,
+                "timestamp": now_time,
+            })
 
         _save_conversations(convs)
 
@@ -323,6 +719,14 @@ async def chat_api(request):
             "is_saved": is_saved,
             "is_save_failed": is_save_failed,
             "saved_path": saved_path,
+            "is_doc_task": is_doc_task,
+            "is_document_agent": is_doc_task,
+            "is_doc_result": is_doc_result,
+            "doc_action": doc_action,
+            "doc_path": doc_path,
+            "doc_filename": doc_filename,
+            "active_document": conv_record.get("active_document"),
+            "download_url": f"/api/uploads/download/{doc_filename}" if doc_filename else None,
             "conversation_id": conv_id,
             "conversation_title": conv_record.get("title", ""),
         })
@@ -336,9 +740,12 @@ async def chat_api(request):
 @csrf_exempt
 async def reset_api(request):
     """Safely cleanup and reset the agent instance for a clean state."""
-    global _agent_instance
+    global _agent_instance, _checkpointer, _store, _doc_agent_instance
     async with _agent_lock:
         if _agent_instance is not None:
             await _safe_cleanup()
-            _agent_instance = None
+        _agent_instance = None
+        _checkpointer = None
+        _store = None
+        _doc_agent_instance = None
     return JsonResponse({"status": "success", "message": "Agent session reset successfully."})

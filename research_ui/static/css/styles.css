@@ -695,3 +695,59 @@ html.light .source-pill {
         padding: 0 !important;
     }
 }
+
+/* =========================================
+   USER CHAT BUBBLE & CONTEXT EDITOR
+   ========================================= */
+.user-chat-bubble {
+  width: auto;
+  min-width: 170px;
+  max-width: 88%;
+  transition: width 0.2s ease, max-width 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .user-chat-bubble {
+    max-width: 42rem; /* Tailwind 2xl default width */
+  }
+}
+
+.user-chat-bubble.is-editing {
+  width: 100%;
+}
+
+/* User Message Scroll Area (Vertical scroll after ~220px, keeping default box width) */
+.user-msg-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+
+.user-msg-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.user-msg-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.user-msg-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 9999px;
+}
+
+.user-msg-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.user-edit-textarea {
+  min-height: 52px;
+  max-height: 220px;
+  width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
