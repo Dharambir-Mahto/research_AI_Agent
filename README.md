@@ -145,9 +145,15 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
+# Google Gemini API Key (Required)
 GEMINI_API_KEY=your_gemini_api_key_here
-GOOGLE_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-flash-lite-latest
+
+# Gemini Model Name (e.g. gemini-2.5-flash, gemini-flash-lite-latest)
+GEMINI_MODEL=demo_model_name
+
+NEO4J_URL=demo_url
+NEO4J_USERNAME=demo_username
+NEO4J_PASSWORD=demo_password
 ```
 
 ---
