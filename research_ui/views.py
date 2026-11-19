@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
@@ -221,13 +221,22 @@ def download_report(request, relpath):
 
 
 def preview_report(request, relpath):
-    """Return text content of a report for previewing (e.g. Markdown)."""
+    """Safely stream report inline for preview (PDF/images) or return JSON for markdown/docx/text."""
     target_path = _find_file_safely(relpath)
     if not target_path or not target_path.is_file():
-        return JsonResponse({"status": "error", "message": "File not found"}, status=404)
+        raise Http404(f"File not found: {relpath}")
 
     ext = target_path.suffix.lower()
-    if ext in [".md", ".txt", ".json", ".csv"]:
+    if ext == ".pdf":
+        response = FileResponse(open(target_path, "rb"), content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{target_path.name}"'
+        return response
+    elif ext in [".png", ".jpg", ".jpeg", ".webp", ".svg"]:
+        content_type, _ = mimetypes.guess_type(str(target_path))
+        response = FileResponse(open(target_path, "rb"), content_type=content_type or "image/png")
+        response["Content-Disposition"] = f'inline; filename="{target_path.name}"'
+        return response
+    elif ext in [".md", ".txt", ".json", ".csv", ".py"]:
         try:
             with open(target_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
@@ -240,14 +249,25 @@ def preview_report(request, relpath):
             })
         except Exception as e:
             return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    elif ext == ".docx":
+        try:
+            import docx
+            doc = docx.Document(target_path)
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            return JsonResponse({
+                "status": "success",
+                "filename": target_path.name,
+                "is_text": True,
+                "content": "\n\n".join(paragraphs),
+                "format": "docx",
+            })
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
     else:
-        return JsonResponse({
-            "status": "success",
-            "filename": target_path.name,
-            "is_text": False,
-            "format": ext.lstrip("."),
-            "download_url": f"/api/reports/download/{target_path.name}",
-        })
+        content_type, _ = mimetypes.guess_type(str(target_path))
+        response = FileResponse(open(target_path, "rb"), content_type=content_type or "application/octet-stream")
+        response["Content-Disposition"] = f'inline; filename="{target_path.name}"'
+        return response
 
 
 def status_api(request):
@@ -439,9 +459,38 @@ def preview_upload_file(request, relpath):
     if not target_path or not target_path.is_file():
         raise Http404(f"File not found: {relpath}")
 
+    ext = target_path.suffix.lower()
+    if ext == ".docx":
+        try:
+            import docx
+            doc = docx.Document(target_path)
+            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+            return JsonResponse({
+                "status": "success",
+                "filename": target_path.name,
+                "is_text": True,
+                "content": "\n\n".join(paragraphs),
+                "format": "docx",
+            })
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    elif ext in [".md", ".txt", ".json", ".csv", ".py"] and request.headers.get("accept") == "application/json":
+        try:
+            with open(target_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            return JsonResponse({
+                "status": "success",
+                "filename": target_path.name,
+                "is_text": True,
+                "content": content,
+                "format": ext.lstrip("."),
+            })
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
     content_type, _ = mimetypes.guess_type(str(target_path))
     if not content_type:
-        content_type = "application/pdf" if target_path.suffix.lower() == ".pdf" else "application/octet-stream"
+        content_type = "application/pdf" if ext == ".pdf" else "application/octet-stream"
 
     response = FileResponse(open(target_path, "rb"), content_type=content_type)
     response["Content-Disposition"] = f'inline; filename="{target_path.name}"'
@@ -541,7 +590,7 @@ async def chat_api(request):
                 response_text = _extract_text(response["messages"][-1].content)
         else:
             agent = await get_or_create_agent()
-            response_text = await ask_gemini(prompt, agent, last_report)
+            response_text = await ask_gemini(prompt, agent, last_report, thread_id=f"research-{conv_id}")
 
         # Check if this was a save confirmation
         stripped = response_text.lstrip()
@@ -735,6 +784,12 @@ async def chat_api(request):
             "status": "error",
             "message": str(error),
         }, status=500)
+
+
+@csrf_exempt
+def favicon_view(request):
+    """Serve a 204 No Content for /favicon.ico to avoid 404 noise."""
+    return HttpResponse(status=204)
 
 
 @csrf_exempt

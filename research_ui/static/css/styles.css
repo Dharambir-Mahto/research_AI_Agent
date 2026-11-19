@@ -438,6 +438,30 @@ code, pre {
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
+.prose-report .katex-display {
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+  text-align: center;
+}
+
+.prose-report .katex {
+  font-size: 1.15em;
+  color: var(--prose-heading);
+}
+
+/* Prevent KaTeX parse errors from rendering in harsh red (#cc0000); adapt seamlessly to light/dark themes */
+.prose-report .katex-error,
+.katex-error {
+  color: var(--prose-body) !important;
+  font-family: inherit !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+}
+
 .prose-report pre {
   background: var(--prose-code-bg) !important;
   border: 1px solid var(--prose-code-border);
@@ -750,4 +774,71 @@ html.light .source-pill {
   width: 100%;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Live Voice Research Popup Animations                                       */
+/* -------------------------------------------------------------------------- */
+@keyframes voice-pulse-expand {
+  0% { transform: scale(0.92); opacity: 0.8; }
+  50% { transform: scale(1.18); opacity: 0.3; }
+  100% { transform: scale(0.92); opacity: 0.8; }
+}
+
+@keyframes voice-wave-bar {
+  0%, 100% { height: 8px; }
+  50% { height: 32px; }
+}
+
+.voice-wave-ring-1 {
+  animation: voice-pulse-expand 2s infinite ease-in-out;
+}
+.voice-wave-ring-2 {
+  animation: voice-pulse-expand 2.6s infinite ease-in-out 0.4s;
+}
+
+.wave-bar {
+  width: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #f43f5e, #818cf8);
+  animation: voice-wave-bar 1.1s infinite ease-in-out;
+}
+.wave-bar:nth-child(1) { animation-delay: 0.0s; }
+.wave-bar:nth-child(2) { animation-delay: 0.25s; }
+.wave-bar:nth-child(3) { animation-delay: 0.45s; }
+.wave-bar:nth-child(4) { animation-delay: 0.15s; }
+.wave-bar:nth-child(5) { animation-delay: 0.35s; }
+
+/* Professional Voice Intelligence Animations */
+.voice-neural-canvas {
+  width: 100%;
+  height: 64px;
+  display: block;
+}
+
+@keyframes shimmer-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.voice-shimmer-progress {
+  position: relative;
+  overflow: hidden;
+}
+
+.voice-shimmer-progress::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmer-slide 1.5s infinite;
+}
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 25px rgba(244, 63, 94, 0.45)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 45px rgba(99, 102, 241, 0.65)); }
+}
+
+.voice-orb-active {
+  animation: orb-breathe 2.4s infinite ease-in-out;
 }

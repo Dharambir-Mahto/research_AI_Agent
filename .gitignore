@@ -49,6 +49,8 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+research/reports/
+uploads/
 
 # Research Agent Dynamic Output & Cache
 logs/

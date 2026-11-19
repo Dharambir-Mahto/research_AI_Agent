@@ -28,4 +28,5 @@ urlpatterns = [
     path("api/uploads/", views.uploads_list_api, name="uploads_list"),
     path("api/uploads/download/<path:relpath>", views.download_upload_file, name="download_upload_file"),
     path("api/uploads/preview/<path:relpath>", views.preview_upload_file, name="preview_upload_file"),
+    path("favicon.ico", views.favicon_view, name="favicon"),
 ]

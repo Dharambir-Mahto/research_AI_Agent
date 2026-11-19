@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gemini-voice-ai"
+version = "1.0.0"
+description = "A modular, plug-and-play Voice AI module powered by the Gemini Live API for any AI Agent or application."
+readme = "gemini_voice/README.md"
+authors = [{ name = "AI Engineering Team" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "google-genai>=3.0.0",
+    "pydantic>=2.0.0",
+    "websockets>=13.0",
+    "aiohttp>=3.9.0",
+]
+
+[project.optional-dependencies]
+audio = [
+    "sounddevice>=0.4.6",
+    "numpy>=1.24.0",
+]
+langgraph = [
+    "langgraph>=0.1.0",
+    "langchain-core>=0.2.0",
+]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gemini_voice*"]

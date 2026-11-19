@@ -26,6 +26,7 @@ Available Tools:
      * edit_text.py <file_path> <find_text> <replace_text>
      * convert_document.py <source_path> <target_format>
      * add_signature.py <pdf_path> <image_path> [page] [x] [y]
+     * compress_pdf.py <input_pdf> [output_pdf]
 3. list_available_scripts()
    - Lists all saved scripts in doc_scripts/.
 
