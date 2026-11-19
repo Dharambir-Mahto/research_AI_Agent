@@ -6,6 +6,13 @@ langchain-mcp-adapters
 langgraph
 google-genai
 
+# Gemini Live Voice AI & Audio Streaming
+websockets
+numpy
+sounddevice
+cffi
+pycparser
+
 # Web Framework & Interface
 Django
 asgiref
@@ -37,3 +44,6 @@ langchain-chroma
 neo4j
 langchain-neo4j
 neurotrace
+
+# Testing & Quality Assurance
+pytest
